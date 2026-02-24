@@ -15,7 +15,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const inputId = id ?? generatedId;
 
     return (
-      <div className={`sm:col-span-4 ${containerClassName}`}>
+      <div className={containerClassName}>
         <label htmlFor={inputId} className="block text-sm font-medium">
           {label}
         </label>

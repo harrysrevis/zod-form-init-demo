@@ -8,8 +8,10 @@ import { Input } from "./components/form/Input";
 import { buildRHFDefaultValues } from "./lib/buildInitValues";
 import { ProfileInput, ProfileSchema } from "./schema";
 import { toDateInputValue, fromDateInputValue } from "./utils/date-utils";
+import useCopyToClipboard from "./hooks/use-copy-to-clipboard";
 
 export default function Home() {
+  const { copied, copyToClipboard } = useCopyToClipboard();
   const defaultValues = buildRHFDefaultValues(ProfileSchema, {
     includeOptional: false,
     overrides: {
@@ -239,8 +241,9 @@ export default function Home() {
                     error={errors.address?.line1?.message}
                   />
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
                     <Input
+                      containerClassName="sm:col-span-2"
                       label="City"
                       placeholder="City"
                       {...register("address.city")}
@@ -248,15 +251,14 @@ export default function Home() {
                     />
 
                     <Input
+                      containerClassName="sm:col-span-2"
                       label="Postcode (optional)"
                       placeholder="Postal code"
                       {...register("address.postcode")}
                       error={errors.address?.postcode?.message}
                     />
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="sm:col-span-1">
+                    <div className="sm:col-span-2">
                       <label className="block text-sm font-medium">
                         Country
                       </label>
@@ -268,7 +270,7 @@ export default function Home() {
                         } focus-within:outline-2 focus-within:-outline-offset-2`}
                       >
                         <select
-                          className="block w-full min-w-0 grow bg-transparent py-1.5 pr-3 pl-1 text-sm focus:outline-none"
+                          className="block w-full min-w-0 grow bg-transparent py-1.5 pr-8 pl-1 sm:text-sm focus:outline-none appearance-none [-webkit-appearance:none] [-moz-appearance:none]"
                           {...register("address.country")}
                           aria-invalid={!!errors.address?.country}
                         >
@@ -373,7 +375,7 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={!isValid || isSubmitting}
-                className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 hover:cursor-pointer disabled:opacity-50 disabled:hover:bg-indigo-500 disabled:cursor-not-allowed"
+                className="ml-auto rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-400 hover:cursor-pointer disabled:opacity-50 disabled:hover:bg-indigo-500 disabled:cursor-not-allowed"
               >
                 Submit
               </button>
@@ -394,15 +396,9 @@ export default function Home() {
                 <button
                   type="button"
                   className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs hover:bg-white/10 hover:cursor-pointer"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(debugJson);
-                    } catch {
-                      // ignore
-                    }
-                  }}
+                  onClick={() => copyToClipboard(debugJson)}
                 >
-                  Copy
+                  {copied ? "Copied" : "Copy"}
                 </button>
               </div>
 

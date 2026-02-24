@@ -9,7 +9,7 @@ export const ProfileSchema = z.object({
   address: z.object({
     line1: z.string().default(""),
     city: z.string().default(""),
-    postcode: z.string().optional(),
+    postcode: z.string().default(""),
     country: z.enum(["GR", "UK", "DE"]).default("GR"),
   }),
 
