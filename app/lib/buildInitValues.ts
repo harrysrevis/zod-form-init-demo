@@ -165,6 +165,112 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 /**
+ * Detect whether a schema branch declares an explicit z.default().
+ * This is used to prioritize union members that encode an intentional default.
+ */
+function hasExplicitDefault(schema: z.ZodType): boolean {
+  schema = unwrap(schema);
+
+  if (schema instanceof z.ZodDefault) return true;
+
+  if (schema instanceof z.ZodOptional) {
+    const inner = asSchema(getDef(schema).innerType);
+    return inner ? hasExplicitDefault(inner) : false;
+  }
+
+  return false;
+}
+
+/**
+ * Score a resolved default value so unions can prefer richer, form-friendly branches.
+ * Higher is better.
+ */
+function scoreResolvedValue(value: unknown): number {
+  if (value === undefined) return -1;
+  if (value === null) return 0;
+
+  if (isPlainObject(value)) {
+    const entries = Object.values(value as Record<string, unknown>).filter(
+      (entry): entry is unknown => entry !== undefined,
+    );
+    const nestedScore = entries.reduce<number>(
+      (sum, entry) => sum + scoreResolvedValue(entry),
+      0,
+    );
+    return 10 + entries.length * 5 + nestedScore;
+  }
+
+  if (Array.isArray(value)) {
+    return value.reduce<number>(
+      (sum, entry) => sum + scoreResolvedValue(entry),
+      2,
+    );
+  }
+
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value instanceof Date
+  ) {
+    return 2;
+  }
+
+  return 1;
+}
+
+/**
+ * Choose the strongest union candidate:
+ * 1) explicit z.default() wins
+ * 2) defined values beat undefined
+ * 3) richer resolved values beat emptier ones
+ * 4) declaration order breaks ties
+ */
+function resolveUnionDefault(
+  options: z.ZodType[],
+  perType?: PerTypeDefaults,
+  includeOptional = false,
+): unknown {
+  let best:
+    | {
+        value: unknown;
+        explicitDefault: boolean;
+        score: number;
+        index: number;
+      }
+    | undefined;
+
+  for (const [index, option] of options.entries()) {
+    const value = defaultForSchema(option, perType, includeOptional);
+    const candidate = {
+      value,
+      explicitDefault: hasExplicitDefault(option),
+      score: scoreResolvedValue(value),
+      index,
+    };
+
+    if (!best) {
+      best = candidate;
+      continue;
+    }
+
+    if (candidate.explicitDefault !== best.explicitDefault) {
+      if (candidate.explicitDefault) best = candidate;
+      continue;
+    }
+
+    if (candidate.score !== best.score) {
+      if (candidate.score > best.score) best = candidate;
+      continue;
+    }
+
+    if (candidate.index < best.index) best = candidate;
+  }
+
+  return best?.value;
+}
+
+/**
  * Generate a best-effort default value for a given Zod schema.
  *
  * Resolution order:
@@ -240,15 +346,13 @@ function defaultForSchema(
   // Literal: the only valid value is the literal itself.
   if (schema instanceof z.ZodLiteral) return schema.value;
 
-  // Union: best-effort, choose the first option and compute its default.
+  // Union: rank all options so explicit defaults and richer resolved values win.
   if (schema instanceof z.ZodUnion) {
     const options = (getDef(schema).options ?? [])
       .map(asSchema)
       .filter(isDefined);
 
-    return options[0]
-      ? defaultForSchema(options[0], perType, includeOptional)
-      : undefined;
+    return resolveUnionDefault(options, perType, includeOptional);
   }
 
   // Primitive fallbacks.
