@@ -118,16 +118,43 @@ describe("z.literal()", () => {
 // ─── z.union() ────────────────────────────────────────────────────────────────
 
 describe("z.union()", () => {
-  it("picks default of first variant", () => {
+  it("keeps declaration order as the tiebreaker for equivalent variants", () => {
     const s = z.object({ x: z.union([z.literal("email"), z.literal("phone")]) });
     expect(buildRHFDefaultValues(s)).toEqual({ x: "email" });
   });
 
-  it("union of objects picks first object's defaults", () => {
+  it("prefers a later branch with an explicit default", () => {
     const s = z.object({
-      x: z.union([z.object({ a: z.string() }), z.object({ b: z.number() })]),
+      x: z.union([z.string(), z.number().default(5)]),
     });
-    expect(buildRHFDefaultValues(s)).toEqual({ x: { a: "" } });
+    expect(buildRHFDefaultValues(s)).toEqual({ x: 5 });
+  });
+
+  it("prefers a later branch with a defined value over undefined", () => {
+    const s = z.object({
+      x: z.union([z.string().optional(), z.string()]),
+    });
+    expect(buildRHFDefaultValues(s)).toEqual({ x: "" });
+  });
+
+  it("prefers richer object defaults over emptier ones", () => {
+    const s = z.object({
+      x: z.union([
+        z.object({ a: z.string() }),
+        z.object({
+          kind: z.literal("email"),
+          enabled: z.boolean().default(true),
+        }),
+      ]),
+    });
+    expect(buildRHFDefaultValues(s)).toEqual({ x: { kind: "email", enabled: true } });
+  });
+
+  it("respects explicit defaults nested under optional union members", () => {
+    const s = z.object({
+      x: z.union([z.string(), z.string().default("fallback").optional()]),
+    });
+    expect(buildRHFDefaultValues(s)).toEqual({ x: "fallback" });
   });
 });
 

@@ -180,7 +180,6 @@ http://localhost:3000
 
 - Improve union default resolution strategy
 - Add support for discriminated unions
-- Add unit tests
 - Extract into standalone npm package
 - Add full test coverage
 
